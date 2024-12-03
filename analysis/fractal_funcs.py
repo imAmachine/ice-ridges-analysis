@@ -43,7 +43,7 @@ class DataAnalyzer:
         self.image_dataloader = image_dataloader
         self.csv_dataloader = csv_dataloader
 
-    def _visualize(filename, log_sizes, log_counts):
+    def _visualize(self, filename, log_sizes, log_counts):
         plt.plot(log_sizes, log_counts, 'o-')
         plt.xlabel("log(1/r)")
         plt.ylabel("log(N(r))")
