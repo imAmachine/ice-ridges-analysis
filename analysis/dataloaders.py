@@ -2,7 +2,7 @@ import os
 import cv2
 
 
-class ImageDataset:
+class ImageDataloader:
     """
     Класс для работы с набором изображений.
     """
@@ -35,7 +35,7 @@ class ImageDataset:
             yield filename, self.load_image(filename)
 
 
-class CSVAnnotationDataset:
+class CSVAnnotationDataloader:
     """
     Класс для работы с разметкой в CSV-файлах.
     """
