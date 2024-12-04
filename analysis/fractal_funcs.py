@@ -70,6 +70,8 @@ class FractalAnalyzer:
         """
         Вычисляет фрактальную размерность по данным.
         """
+        sizes, counts = zip(*[(s, c) for s, c in zip(sizes, counts) if c > 0])
+
         log_sizes = np.log(1 / np.array(sizes))
         log_counts = np.log(np.array(counts))
         coefficients = np.polyfit(log_sizes, log_counts, 1)
@@ -85,7 +87,7 @@ class DataAnalyzer:
         self.image_dataloader = image_dataloader
         self.csv_dataloader = csv_dataloader
 
-    def _visualize(filename, log_sizes, log_counts):
+    def _visualize(self, filename, log_sizes, log_counts):
         plt.plot(log_sizes, log_counts, 'o-')
         plt.xlabel("log(1/r)")
         plt.ylabel("log(N(r))")
