@@ -87,11 +87,11 @@ class DataAnalyzer:
         self.image_dataloader = image_dataloader
         self.csv_dataloader = csv_dataloader
 
-    def _visualize(self, filename, log_sizes, log_counts):
+    def _visualize(self, log_sizes, log_counts, title):
         plt.plot(log_sizes, log_counts, 'o-')
         plt.xlabel("log(1/r)")
         plt.ylabel("log(N(r))")
-        plt.title(f"Фрактальная размерность: {filename}")
+        plt.title(title)
         plt.show()
 
     def _images_analyze(self):
@@ -107,7 +107,7 @@ class DataAnalyzer:
             results.append((filename, fractal_dimension))
 
             print(f"Фрактальная размерность для {filename}: {fractal_dimension}")
-            self._visualize(filename, log_sizes, log_counts, "Фрактальная размерность (изображение)")
+            self._visualize(log_sizes, log_counts, title=f"Фрактальная размерность ({filename})")
 
         return results
 
@@ -128,8 +128,8 @@ class DataAnalyzer:
             print(f"Метод Хигучи для {filename}: {higuchi_dimension}")
             print(f"Метод дисперсии для {filename}: {variance_dimension}")
 
-            self._visualize(filename, log_k, log_L, "Метод Хигучи")
-            self._visualize(filename, log_scales, log_variances, "Метод дисперсии")
+            self._visualize(log_k, log_L, title=f"Метод Хигучи ({filename})")
+            self._visualize(log_scales, log_variances, title=f"Метод дисперсии ({filename})")
 
         return results
 
