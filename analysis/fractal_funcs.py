@@ -87,58 +87,122 @@ class DataAnalyzer:
         self.image_dataloader = image_dataloader
         self.csv_dataloader = csv_dataloader
 
-    def _visualize(self, log_sizes, log_counts, title):
-        plt.plot(log_sizes, log_counts, 'o-')
-        plt.xlabel("log(1/r)")
-        plt.ylabel("log(N(r))")
-        plt.title(title)
+    def _visualize(self, log_sizes, log_counts, filename, show_separately=True, ax=None):
+        """
+        Визуализация с возможностью выбора вывода графиков по отдельности или все вместе.
+        Подпись на графике будет только с названием файла.
+        """
+        if show_separately:
+            fig, ax = plt.subplots(figsize=(8, 6))
+            ax.plot(log_sizes, log_counts, 'o-')
+            ax.set_xlabel("log(1/r)")
+            ax.set_ylabel("log(N(r))")
+            ax.set_title(filename)
+            plt.show()
+        else:
+            ax.plot(log_sizes, log_counts, 'o-')
+            ax.set_xlabel("log(1/r)")
+            ax.set_ylabel("log(N(r))")
+            ax.set_title(filename)
+
+        return ax
+
+    def _create_combined_plot(self, log_data, method_name):
+        """
+        Метод для объединённого отображения графиков в сетке.
+        Название метода выводится один раз в общем заголовке.
+        """
+        n_plots = len(log_data)
+        n_cols = 5  # Задаём количество столбцов
+        n_rows = (n_plots + 1) // n_cols  # Расчитываем количество строк
+
+        fig, axes = plt.subplots(n_rows, n_cols, figsize=(18, 3 * n_rows))
+        fig.suptitle(method_name, fontsize=16)  # Общий заголовок для всех графиков
+
+        # Если у нас только один график, ax будет не список, а один объект
+        if n_rows == 1:
+            axes = [axes]
+
+        # Проходим по всем данным и отображаем графики
+        for idx, (log_sizes, log_counts, filename) in enumerate(log_data):
+            row = idx // n_cols
+            col = idx % n_cols
+            ax = axes[row][col] if n_rows > 1 else axes[col]
+            ax.plot(log_sizes, log_counts, 'o-', markersize=2)
+            ax.set_xlabel("log(1/r)")
+            ax.set_ylabel("log(N(r))")
+            ax.set_title(filename)
+
+        # Убираем пустые подграфики, если количество графиков не делится нацело на количество столбцов
+        for idx in range(n_plots, n_rows * n_cols):
+            fig.delaxes(axes.flatten()[idx])
+
+        plt.tight_layout()
+        plt.subplots_adjust(top=0.9)  # Оставляем место для заголовка
         plt.show()
 
-    def _images_analyze(self):
+    def _analyze_images(self, show_separately=True):
         """
-        Анализ изображений на фрактальную размерность.
+        Анализ изображений и визуализация фрактальной размерности.
         """
         results = []
+        log_data = []
 
         print("Анализ изображений:")
-        for filename, binary_image in self.image_dataloader.get_all_images():
+        for idx, (filename, binary_image) in enumerate(self.image_dataloader.get_all_images()):
             sizes, counts = FractalAnalyzer.box_counting(binary_image)
             fractal_dimension, log_sizes, log_counts = FractalAnalyzer.calculate_fractal_dimension(sizes, counts)
             results.append((filename, fractal_dimension))
 
             print(f"Фрактальная размерность для {filename}: {fractal_dimension}")
-            self._visualize(log_sizes, log_counts, title=f"Фрактальная размерность ({filename})")
+            if show_separately:
+                self._visualize(log_sizes, log_counts, filename=f"Фрактальная размерность ({filename})", show_separately=True)
+            else:
+                log_data.append((log_sizes, log_counts, filename))
+
+        if not show_separately:
+            self._create_combined_plot(log_data, 'Фрактальная размерность')
 
         return results
 
-    def _time_series_analyze(self):
+    def _analyze_time_series(self, show_separately=True):
         """
-        Анализ временных рядов из CSV-файлов.
+        Анализ временных рядов и визуализация методов Хигучи и дисперсии.
         """
         results = []
+        log_data_higuchi = []
+        log_data_variance = []
 
         print("Анализ временных рядов:")
         for filename, data in self.csv_dataloader.get_all_csv():
             time_series = data.iloc[:, 0].values
             higuchi_dimension, log_k, log_L = FractalAnalyzer.higuchi(time_series, k_max=10)
             variance_dimension, log_scales, log_variances = FractalAnalyzer.variance(time_series, scales=[2, 4, 8, 16, 32])
-            
+
             results.append((filename, higuchi_dimension, variance_dimension))
 
             print(f"Метод Хигучи для {filename}: {higuchi_dimension}")
             print(f"Метод дисперсии для {filename}: {variance_dimension}")
 
-            self._visualize(log_k, log_L, title=f"Метод Хигучи ({filename})")
-            self._visualize(log_scales, log_variances, title=f"Метод дисперсии ({filename})")
+            if show_separately:
+                self._visualize(log_k, log_L, filename=f"Метод Хигучи ({filename})", show_separately=True)
+                self._visualize(log_scales, log_variances, filename=f"Метод дисперсии ({filename})", show_separately=True)
+            else:
+                log_data_higuchi.append((log_k, log_L, filename))
+                log_data_variance.append((log_scales, log_variances, filename))
+
+        if not show_separately:
+            self._create_combined_plot(log_data_higuchi, 'Метод Хигучи')
+            self._create_combined_plot(log_data_variance, 'Метод дисперсии')
 
         return results
 
-    def analyze(self):
+    def analyze(self, show_separately=True):
         """
         Основной метод анализа.
         """
-        images_results = self._images_analyze()
-        time_series_results = self._time_series_analyze()
+        images_results = self._analyze_images(show_separately)
+        time_series_results = self._analyze_time_series(show_separately)
 
         # Вывод результатов анализа изображений
         print("\nРезультаты анализа изображений:")

@@ -8,7 +8,7 @@ def main():
     csv_dataloader = CSVAnnotationDataloader(CSV_FOLDER_PATH)
 
     analyzer = DataAnalyzer(image_dataloader, csv_dataloader)
-    analyzer.analyze()
+    analyzer.analyze(show_separately=False)
 
 
 if __name__ == "__main__":
