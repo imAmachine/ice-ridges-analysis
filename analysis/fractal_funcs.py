@@ -3,6 +3,7 @@ import numpy as np
 import cv2
 import matplotlib.pyplot as plt
 import pandas as pd
+from scipy.stats import linregress
 
 
 class FractalAnalyzer:
@@ -17,9 +18,14 @@ class FractalAnalyzer:
         sizes = []
         counts = []
 
-        for size in range(1, binary_image.shape[0] // 2, 2):
-            resized = cv2.resize(binary_image, (size, size), interpolation=cv2.INTER_NEAREST)
-            count = np.sum(resized > 0)
+        min_side = min(binary_image.shape)
+        for size in range(2, min_side // 2 + 1, 2):
+            count = 0
+            for x in range(0, binary_image.shape[0] + 1, size):
+                for y in range(0, binary_image.shape[1] + 1, size):
+                    if np.any(binary_image[x:x+size, y:y+size] > 0):
+                        count += 1
+            
             sizes.append(size)
             counts.append(count)
 
@@ -27,58 +33,64 @@ class FractalAnalyzer:
 
     @staticmethod
     def higuchi(data, k_max):
-        """
-        Реализация метода Хигучи для временных рядов.
-        """
+        if len(data) < k_max:
+            raise ValueError("Length of spatial data is less than k_max.")
+
         L = []
+
         for k in range(1, k_max + 1):
             Lk = []
-            for m in range(k):
-                sum_diff = 0
-                for i in range(1, (len(data) - m) // k):
-                    sum_diff += abs(data[m + i * k] - data[m + (i - 1) * k])
-                normalization = (len(data) - 1) / (k * (len(data) - m))
-                Lk.append(sum_diff * normalization)
-            L.append(np.mean(Lk))
 
-        log_k = np.log(np.arange(1, k_max + 1))
-        log_L = np.log(L)
-        coefficients = np.polyfit(log_k, log_L, 1)
-        fractal_dimension = -coefficients[0]
-        
-        return fractal_dimension, log_k, log_L
+            for m in range(k):
+                sum_distance = 0
+                count = 0
+
+                for i in range(1, (len(data) - m) // k + 1):
+                    point1 = np.array(data[m + (i - 1) * k])
+                    point2 = np.array(data[m + i * k])
+                    sum_distance += np.linalg.norm(point2 - point1)
+                    count += 1
+
+                if count > 0:
+                    normalization = (len(data) - 1) / (k * count * k)
+                    Lk.append(sum_distance * normalization)
+
+            if Lk:
+                L.append(np.mean(Lk))
+
+        return np.arange(1, k_max + 1), L
 
     @staticmethod
     def variance(data, scales):
-        """
-        Реализация метода дисперсии (variance) для фрактальной размерности.
-        """
         variances = []
-        for scale in scales:
-            segments = len(data) // scale
-            reshaped = data[:segments * scale].reshape(segments, scale)
-            local_variances = np.var(reshaped, axis=1)
-            variances.append(np.mean(local_variances))
 
-        log_scales = np.log(1 / np.array(scales))
-        log_variances = np.log(variances)
-        coefficients = np.polyfit(log_scales, log_variances, 1)
-        fractal_dimension = -coefficients[0] / 2
-        
-        return fractal_dimension, log_scales, log_variances
+        for scale in scales:
+            if scale <= len(data):
+                segments = len(data) // scale
+                
+                # Reshape the data into segments
+                reshaped = np.array(data[:segments * scale]).reshape(segments, scale, 2)
+                
+                # Calculate local variances for each segment
+                local_variances = []
+                for segment in reshaped:
+                    # Calculate pairwise distances within the segment
+                    pairwise_distances = [
+                        np.linalg.norm(segment[j] - segment[j+1]) 
+                        for j in range(len(segment) - 1)
+                    ]
+                    local_variances.append(np.var(pairwise_distances))
+                
+                variances.append(np.mean(local_variances))
+
+        return 1 / np.array(scales[:len(variances)]), variances
 
     @staticmethod
-    def calculate_fractal_dimension(sizes, counts):
-        """
-        Вычисляет фрактальную размерность по данным.
-        """
-        sizes, counts = zip(*[(s, c) for s, c in zip(sizes, counts) if c > 0])
-
-        log_sizes = np.log(1 / np.array(sizes))
-        log_counts = np.log(np.array(counts))
-        coefficients = np.polyfit(log_sizes, log_counts, 1)
-        fractal_dimension = -coefficients[0]
-        return fractal_dimension, log_sizes, log_counts
+    def calculate_fractal_dimension(sizes, counts, epsilon=1e-10):
+        log_sizes = np.log(np.array(sizes))
+        log_counts = np.log(np.array(counts) + epsilon)
+        slope, intercept, r_value, p_value, std_err = linregress(log_sizes, log_counts)
+        return np.abs(slope)
 
 
 class DataAnalyzer:
@@ -97,9 +109,9 @@ class DataAnalyzer:
         results = []
 
         logging.info("Начат анализ изображений.")
-        for filename, binary_image in self.image_dataloader.get_all_images():
+        for filename, binary_image in self.image_dataloader.get_all_data():
             sizes, counts = FractalAnalyzer.box_counting(binary_image)
-            fractal_dimension, _, _ = FractalAnalyzer.calculate_fractal_dimension(sizes, counts)
+            fractal_dimension = FractalAnalyzer.calculate_fractal_dimension(sizes, counts)
             results.append({
                 "filename": filename,
                 "fractal_dimension": fractal_dimension
@@ -108,46 +120,58 @@ class DataAnalyzer:
         logging.info("Анализ изображений завершён.")
         return pd.DataFrame(results)
 
+    def extract_coordinates(ridge_data):
+        """
+        Extract coordinate points from the ridge data
+        
+        Args:
+        - ridge_data: DataFrame containing ridge information
+        
+        Returns:
+        - List of coordinate tuples
+        """
+        # Assuming the coordinate column is stored as a string like "(x, y)"
+        coordinates = ridge_data['Value of the first coordinate (X, Y)'].apply(
+            lambda x: tuple(map(float, x.strip('()').split(',')))
+        ).tolist()
+        
+        return coordinates
+    
     def _analyze_time_series(self, k_max=10, scales=None):
-        """
-        Анализ временных рядов методами Хигучи и дисперсии.
-        """
         if scales is None:
             scales = [2, 4, 8, 16, 32]
 
         results = []
 
-        logging.info("Начат анализ временных рядов.")
-        for filename, data in self.csv_dataloader.get_all_csv():
+        for filename, data in self.csv_dataloader.get_all_data():
             try:
-                # Параметры для анализа
-                params = {
-                    "Area": data["Area"],
-                    "Length": data["Length"],
-                    "Width": data["Width"],
-                    "Ridge orientation angle": data["Ridge orientation angle"]
-                }
-
-                # Анализ для каждого параметра
-                for param_name, time_series in params.items():
-                    # Метод Хигучи
-                    higuchi_dimension, _, _ = FractalAnalyzer.higuchi(time_series.values, k_max=k_max)
-
-                    # Метод дисперсии
-                    variance_dimension, _, _ = FractalAnalyzer.variance(time_series.values, scales=scales)
-
-                    # Сохранение результатов
-                    results.append({
-                        "filename": filename,
-                        "parameter": param_name,
-                        "higuchi_dimension": higuchi_dimension,
-                        "variance_dimension": variance_dimension
-                    })
+                # Extract coordinates
+                coordinates = self.extract_coordinates(data)
+                
+                # Higuchi analysis
+                if len(coordinates) >= k_max:
+                    higguchi_a, higguchi_b = FractalAnalyzer.higuchi_spatial(coordinates, k_max=k_max)
+                    higguchi_fractal_dimension = FractalAnalyzer.calculate_fractal_dimension(higguchi_a, higguchi_b)
+                else:
+                    higguchi_fractal_dimension = None
+                
+                # Variance analysis
+                if len(coordinates) >= min(scales):
+                    variance_a, variance_b = FractalAnalyzer.variance_spatial(coordinates, scales=scales)
+                    variance_fractal_dimension = FractalAnalyzer.calculate_fractal_dimension(variance_a, variance_b)
+                else:
+                    variance_fractal_dimension = None
+                
+                # Store results
+                results.append({
+                    "filename": filename,
+                    "higuchi_dimension": higguchi_fractal_dimension,
+                    "variance_dimension": variance_fractal_dimension
+                })
 
             except Exception as e:
-                logging.error(f"Ошибка при обработке файла {filename}: {e}")
+                logging.error(f"Error processing file {filename}: {e}")
 
-        logging.info("Анализ временных рядов завершён.")
         return pd.DataFrame(results)
 
     def analyze(self):
@@ -161,7 +185,7 @@ class DataAnalyzer:
 
         # Анализ временных рядов
         time_series_results = self._analyze_time_series()
-        print("\nРезультаты анализа временных рядов:")
+        print("\nРезультаты анализа пространственных рядов:")
         print(time_series_results.to_string(index=False, justify='center'))
 
-        return images_results, time_series_results
+        return images_results#, time_series_results

@@ -28,7 +28,7 @@ class ImageDataloader:
         _, binary_image = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
         return binary_image
 
-    def get_all_images(self):
+    def get_all_data(self):
         """
         Генерирует бинарные изображения из всех файлов в папке.
         """
@@ -57,7 +57,7 @@ class CSVAnnotationDataloader:
         path = os.path.join(self.folder_path, filename)
         return pd.read_csv(path)
 
-    def get_all_csv(self):
+    def get_all_data(self):
         """
         Генерирует DataFrame для всех CSV-файлов в папке.
         """
