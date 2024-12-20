@@ -5,12 +5,12 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from osgeo import gdal
 from itertools import combinations
-from math import radians, sin, cos, atan2, sqrt
+from math import radians, sin, cos, atan2, sqrt, pi
 gdal.DontUseExceptions()
 
 class GeoTiffAnalyzer:
-    METERS_PER_DEGREE_LAT = 111320
-    EARTH_RADIUS_M = 6371000
+    SEMI_MAJOR_AXIS = 6378137.0
+    SEMI_MINOR_AXIS = 6356752.3142
 
     def __init__(self, input_folder, output_folder):
         self.input_folder = input_folder
@@ -22,6 +22,14 @@ class GeoTiffAnalyzer:
         if not os.path.exists(output_folder):
             os.mkdir(output_folder)
 
+    def _latlon_to_meters(self, lat):
+        """Перевод градусов широты в метры с учетом эллипсоида WGS-84"""
+        e2 = 1 - (self.SEMI_MINOR_AXIS ** 2 / self.SEMI_MAJOR_AXIS ** 2)  # Квадрат эксцентриситета
+        nu = self.SEMI_MAJOR_AXIS / sqrt(1 - e2 * sin(radians(lat)) ** 2)
+        meters_per_lat = pi / 180 * self.SEMI_MAJOR_AXIS * (1 - e2) / (1 - e2 * sin(radians(lat)) ** 2) ** 1.5
+        meters_per_lon = pi / 180 * nu * cos(radians(lat))
+        return meters_per_lat, meters_per_lon
+
     def get_geo_info(self, file_path):
         dataset = gdal.Open(file_path)
         if not dataset:
@@ -29,7 +37,7 @@ class GeoTiffAnalyzer:
         
         gt = dataset.GetGeoTransform()
         lat_center = gt[3] + (dataset.RasterYSize * gt[5] / 2)
-        meters_per_lon = self.METERS_PER_DEGREE_LAT * cos(radians(lat_center))
+        meters_per_lat, meters_per_lon = self._latlon_to_meters(lat_center)
         
         # Координаты углов изображения
         upper_left_lon = gt[0]  # Долгота верхнего левого угла
@@ -41,7 +49,7 @@ class GeoTiffAnalyzer:
         upper_right_lon = upper_left_lon + (dataset.RasterXSize * pixel_size_x_deg)
         
         ground_resolution_x = abs(upper_right_lon - upper_left_lon) * meters_per_lon
-        ground_resolution_y = abs(upper_left_lat - lower_left_lat) * self.METERS_PER_DEGREE_LAT
+        ground_resolution_y = abs(upper_left_lat - lower_left_lat) * meters_per_lat
         
         return {
             'file': os.path.basename(file_path),
@@ -50,7 +58,7 @@ class GeoTiffAnalyzer:
             'origin_x': gt[0],
             'origin_y': gt[3],
             'pixel_size_x': abs(gt[1] * meters_per_lon),
-            'pixel_size_y': abs(gt[5] * self.METERS_PER_DEGREE_LAT),
+            'pixel_size_y': abs(gt[5] * meters_per_lat),
             'ground_resolution_x': ground_resolution_x,
             'ground_resolution_y': ground_resolution_y
         }
@@ -71,7 +79,7 @@ class GeoTiffAnalyzer:
         lat1, lon1, lat2, lon2 = map(radians, [lat1, lon1, lat2, lon2])
         dlat, dlon = lat2 - lat1, lon2 - lon1
         a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
-        return 2 * self.EARTH_RADIUS_M * atan2(sqrt(a), sqrt(1-a))
+        return 2 * self.SEMI_MAJOR_AXIS * atan2(sqrt(a), sqrt(1-a))
 
     def get_distances(self, geo_data):
         distances = []

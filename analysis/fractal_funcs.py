@@ -120,7 +120,7 @@ class DataAnalyzer:
         logging.info("Анализ изображений завершён.")
         return pd.DataFrame(results)
 
-    def extract_coordinates(ridge_data):
+    def extract_coordinates(self, ridge_data):
         """
         Extract coordinate points from the ridge data
         

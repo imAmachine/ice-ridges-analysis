@@ -4,10 +4,9 @@ from analysis.funcs_koch import SnowKoch, SierpinskiTriangle, FractalTester
 from analysis.geotif_analyzer import GeoTiffAnalyzer
 from settings import CSV_FOLDER_PATH, MASKS_FOLDER_PATH, SOURCE_IMAGES_FOLDER_PATH, OUTPUT_FOLDER_PATH
 
-def analize_data():
+def analyze_fractal():
     image_dataloader = ImageDataloader(MASKS_FOLDER_PATH)
     csv_dataloader = CSVAnnotationDataloader(CSV_FOLDER_PATH)
-
     analyzer = DataAnalyzer(image_dataloader, csv_dataloader)
     analyzer.analyze()
 
@@ -16,9 +15,11 @@ def analyze_geotiff():
     tif_analyzer.analyze()
 
 def main():
-    tester = FractalTester(SnowKoch, order=3, size=512, show_image=False, length=1.0)
-    fractal_dimension = tester.test_fractal()
-    print(f"Fractal Dimension (SnowKoch): {fractal_dimension:.5f}")
+    analyze_geotiff()
+    analyze_fractal()
+    # tester = FractalTester(SnowKoch, order=3, size=512, show_image=False, length=1.0)
+    # fractal_dimension = tester.test_fractal()
+    # print(f"Fractal Dimension (SnowKoch): {fractal_dimension:.5f}")
 
 if __name__ == "__main__":
     main()
