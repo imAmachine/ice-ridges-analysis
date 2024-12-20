@@ -2,6 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 from scipy.stats import linregress
+from .fractal_funcs import FractalAnalyzer
 
 class SnowKoch:
     def __init__(self, order=3, size=512, length=1.0):
@@ -69,7 +70,7 @@ class SnowKoch:
         plt.show()
 
 class SierpinskiTriangle:
-    def __init__(self, order=5, size=512):
+    def __init__(self, order=5, size=512, length=1):
         self.order = order
         self.size = size
         self.image = None
@@ -104,3 +105,79 @@ class SierpinskiTriangle:
         plt.imshow(binary_image, cmap='gray')
         plt.title(f"Order: {order}, Size: {size}")
         plt.show()
+
+class FractalTester:
+    def __init__(self, fractal_class, order=3, size=512, show_image=False, **kwargs):
+        """
+        Класс для проверки фрактальных свойств.
+
+        :param fractal_class: Класс фрактала (например, SnowKoch или SierpinskiTriangle).
+        :param order: Порядок фрактала.
+        :param size: Размер изображения.
+        :param show_image: Показывать ли изображение фрактала.
+        :param kwargs: Дополнительные параметры для инициализации фрактала.
+        """
+        self.fractal = fractal_class(order=order, size=size, **kwargs)
+        self.order = order
+        self.size = size
+        self.show_image = show_image
+
+    def test_fractal(self):
+        """Проверка фрактала с использованием метода box counting."""
+        binary_image = self.fractal.get_binary()
+
+        if self.show_image:
+            self._show_fractal_image(binary_image)
+
+        sizes, counts = FractalAnalyzer.box_counting(binary_image)
+        fractal_dimension = FractalAnalyzer.calculate_fractal_dimension(sizes, counts)
+        self._plot_log_counts_vs_sizes(sizes, counts)
+        quality_metrics = self._evaluate_approximation_quality(sizes, counts)
+        print(f"R^2: {quality_metrics['r_squared']:.5f}")
+        print(f"Standard Deviation: {quality_metrics['std_dev']:.5f}")
+        return fractal_dimension
+
+    def _show_fractal_image(self, binary_image):
+        """Отображение изображения фрактала."""
+        plt.imshow(binary_image, cmap='gray')
+        plt.title(f"Fractal (Order: {self.order}, Size: {self.size})")
+        plt.axis('off')
+        plt.show()
+
+    @staticmethod
+    def _plot_log_counts_vs_sizes(sizes, counts):
+        log_sizes = np.log(sizes)
+        log_counts = np.log(counts)
+
+        plt.figure(figsize=(8, 6))
+        plt.plot(log_sizes, log_counts, 'o-', label='Box Counting Data')
+        plt.title("Log(Counts) vs. Log(Sizes)")
+        plt.xlabel("Log(Sizes)")
+        plt.ylabel("Log(Counts)")
+        plt.grid(True)
+        plt.legend()
+        plt.show()
+
+    @staticmethod
+    def _evaluate_approximation_quality(sizes, counts):
+        """
+        Расчет коэффициента детерминации (R^2) и стандартного отклонения.
+        """
+        log_sizes = np.log(np.array(sizes))
+        log_counts = np.log(np.array(counts))
+
+        slope, intercept, r_value, p_value, std_err = linregress(log_sizes, log_counts)
+
+        # Предсказанные значения
+        predicted_counts = slope * log_sizes + intercept
+
+        # Остатки (разности между реальными и предсказанными значениями)
+        residuals = log_counts - predicted_counts
+
+        # Стандартное отклонение
+        std_dev = np.std(residuals)
+
+        return {
+            'r_squared': r_value ** 2,
+            'std_dev': std_dev,
+        }
