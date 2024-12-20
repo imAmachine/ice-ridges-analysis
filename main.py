@@ -1,14 +1,19 @@
 from analysis.dataloaders import CSVAnnotationDataloader, ImageDataloader
 from analysis.fractal_funcs import DataAnalyzer, FractalAnalyzer
 from analysis.funcs_koch import SnowKoch, SierpinskiTriangle, FractalTester
-from settings import PHOTOS_FOLDER_PATH, CSV_FOLDER_PATH
+from analysis.geotif_analyzer import GeoTiffAnalyzer
+from settings import CSV_FOLDER_PATH, MASKS_FOLDER_PATH, SOURCE_IMAGES_FOLDER_PATH, OUTPUT_FOLDER_PATH
 
 def analize_data():
-    image_dataloader = ImageDataloader(PHOTOS_FOLDER_PATH)
+    image_dataloader = ImageDataloader(MASKS_FOLDER_PATH)
     csv_dataloader = CSVAnnotationDataloader(CSV_FOLDER_PATH)
 
     analyzer = DataAnalyzer(image_dataloader, csv_dataloader)
     analyzer.analyze()
+
+def analyze_geotiff():
+    tif_analyzer = GeoTiffAnalyzer(SOURCE_IMAGES_FOLDER_PATH, OUTPUT_FOLDER_PATH)
+    tif_analyzer.analyze()
 
 def main():
     tester = FractalTester(SnowKoch, order=3, size=512, show_image=False, length=1.0)
