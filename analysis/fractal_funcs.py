@@ -184,8 +184,8 @@ class DataAnalyzer:
         print(images_results.to_string(index=False, justify='center'))
 
         # Анализ временных рядов
-        time_series_results = self._analyze_time_series()
-        print("\nРезультаты анализа пространственных рядов:")
-        print(time_series_results.to_string(index=False, justify='center'))
+        # time_series_results = self._analyze_time_series()
+        # print("\nРезультаты анализа пространственных рядов:")
+        # print(time_series_results.to_string(index=False, justify='center'))
 
         return images_results#, time_series_results
