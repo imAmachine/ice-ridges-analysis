@@ -107,7 +107,7 @@ class SierpinskiTriangle:
         plt.show()
 
 class FractalTester:
-    def __init__(self, fractal_class, order=3, size=512, show_image=False, **kwargs):
+    def __init__(self, fractal_class=SnowKoch, order=3, size=512, show_image=False, **kwargs):
         """
         Класс для проверки фрактальных свойств.
 
