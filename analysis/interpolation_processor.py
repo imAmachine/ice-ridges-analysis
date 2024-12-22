@@ -45,7 +45,7 @@ class InterpolationProcessor:
         """
         Интерполяция изображений группы без обрезки, с унификацией размера пикселя.
         """
-        group_output_dir = os.path.join(self.output_dir, group_name)
+        group_output_dir = os.path.join(self.output_dir, 'images')
         os.makedirs(group_output_dir, exist_ok=True)
         
         tiff_files_path = [os.path.join(self.input_dir, f"{file}") for file in group_data['file']]
@@ -55,9 +55,14 @@ class InterpolationProcessor:
 
         # Интерполяция каждого файла без изменения экстента
         for file_path in tiff_files_path:
+            if not os.path.exists(file_path):
+                print(f'файла не существует')
+                continue
+            
+            output_path = os.path.join(group_output_dir, f"{os.path.basename(file_path).replace('.tif', '')}_{group_name}_interpolated.tif")
             self.interpolate_file(avg_pixel_deg_size=(avg_pixel_width, avg_pixel_height), 
                                   file=file_path, 
-                                  output_file=os.path.join(group_output_dir, f"{os.path.basename(file_path.replace('.tif', ''))}_interpolated.tif"))
+                                  output_file=output_path)
 
     def process(self, geo_data_path, groups: dict):
         data = pd.read_csv(geo_data_path)

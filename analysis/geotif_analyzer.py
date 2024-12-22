@@ -62,8 +62,8 @@ class GeoTiffAnalyzer:
             'file': os.path.basename(file_path),
             'width': dataset.RasterXSize,
             'height': dataset.RasterYSize,
-            'origin_x': gt[0],
-            'origin_y': gt[3],
+            'origin_x': upper_left_lon,
+            'origin_y': upper_left_lat,
             'pixel_size_x_deg': pixel_size_x_deg,
             'pixel_size_y_deg': pixel_size_y_deg,
             'pixel_size_x_m': pixel_size_x,
@@ -82,8 +82,6 @@ class GeoTiffAnalyzer:
                 geo_data.append(self.get_info_from_geotiff(file_path))
         
         df = pd.DataFrame(geo_data)
-        output_path = os.path.join(self.output_folder, 'geo_data.csv')
-        df.to_csv(output_path, index=False)
         return df
 
     def get_distances(self, geo_data):
@@ -111,13 +109,9 @@ class GeoTiffAnalyzer:
         ])
         
         df = pd.DataFrame(distances)
-        output_path = os.path.join(self.output_folder, 'distances.csv')
-        df.to_csv(output_path, index=False)
         return df
 
-    def plot_distances(self, distances_df):
-        output_path = os.path.join(self.output_folder, 'distance_matrix.png')
-        
+    def plot_distances(self, distances_df, save_path):
         files = sorted(set(distances_df['file1']).union(distances_df['file2']))
         matrix = pd.DataFrame(0.0, index=files, columns=files)
         
@@ -137,12 +131,10 @@ class GeoTiffAnalyzer:
         plt.ylabel("Image")
         plt.xticks(rotation=90)
         plt.tight_layout()
-        plt.savefig(output_path)
+        plt.savefig(save_path)
         plt.close()
 
-    def plot_resolutions(self, geo_data):
-        output_path = os.path.join(self.output_folder, 'average_resolution.png')
-        
+    def plot_resolutions(self, geo_data, save_path):        
         geo_data['avg_resolution'] = (geo_data['pixel_size_x_m'] + geo_data['pixel_size_y_m']) / 2
         plt.figure(figsize=(14, 8))
         sns.barplot(data=geo_data, x='file', y='avg_resolution', hue='file', dodge=False, palette='viridis')
@@ -151,12 +143,22 @@ class GeoTiffAnalyzer:
         plt.ylabel("Average Resolution (m)")
         plt.xticks(rotation=90)
         plt.tight_layout()
-        plt.savefig(output_path)
+        plt.savefig(save_path)
         plt.close()
 
-    def analyze(self):
+    def analyze(self, analyze_name, plot_distances=False, pixel_size_barplot=True):
         """Выполнить полный анализ"""
         geo_data = self._process_geotifs()
         distances = self.get_distances(geo_data)
-        self.plot_distances(distances)
-        self.plot_resolutions(geo_data)
+        
+        analyze_path = os.path.join(self.output_folder, analyze_name)
+        os.makedirs(analyze_path, exist_ok=True)
+        
+        geo_data.to_csv(os.path.join(analyze_path, 'geo_data.csv'))
+        distances.to_csv(os.path.join(analyze_path, 'distances.csv'))
+        
+        if plot_distances:
+            self.plot_distances(distances, os.path.join(analyze_path, 'distances.png'))
+        
+        if pixel_size_barplot:
+            self.plot_resolutions(geo_data, os.path.join(analyze_path, 'pixel_size_plot.png'))
