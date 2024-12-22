@@ -50,6 +50,10 @@ class GeoTiffAnalyzer:
         lower_left_lat = upper_left_lat + (dataset.RasterYSize * pixel_size_y_deg)
         upper_right_lon = upper_left_lon + (dataset.RasterXSize * pixel_size_x_deg)
         
+        pixel_size_x = abs(gt[1] * meters_per_lon)
+        pixel_size_y = abs(gt[5] * meters_per_lat)
+        pixel_area = pixel_size_x * pixel_size_y
+        
         ground_resolution_x = abs(upper_right_lon - upper_left_lon) * meters_per_lon
         ground_resolution_y = abs(upper_left_lat - lower_left_lat) * meters_per_lat
         ground_area_m2 = ground_resolution_x * ground_resolution_y
@@ -60,8 +64,11 @@ class GeoTiffAnalyzer:
             'height': dataset.RasterYSize,
             'origin_x': gt[0],
             'origin_y': gt[3],
-            'pixel_size_x': abs(gt[1] * meters_per_lon),
-            'pixel_size_y': abs(gt[5] * meters_per_lat),
+            'pixel_size_x_deg': pixel_size_x_deg,
+            'pixel_size_y_deg': pixel_size_y_deg,
+            'pixel_size_x_m': pixel_size_x,
+            'pixel_size_y_m': pixel_size_y,
+            'pixel_area': pixel_area,
             'ground_resolution_x': ground_resolution_x,
             'ground_resolution_y': ground_resolution_y,
             'ground_area_m2': ground_area_m2
@@ -136,7 +143,7 @@ class GeoTiffAnalyzer:
     def plot_resolutions(self, geo_data):
         output_path = os.path.join(self.output_folder, 'average_resolution.png')
         
-        geo_data['avg_resolution'] = (geo_data['pixel_size_x'] + geo_data['pixel_size_y']) / 2
+        geo_data['avg_resolution'] = (geo_data['pixel_size_x_m'] + geo_data['pixel_size_y_m']) / 2
         plt.figure(figsize=(14, 8))
         sns.barplot(data=geo_data, x='file', y='avg_resolution', hue='file', dodge=False, palette='viridis')
         plt.title("Average Resolution per Image")
@@ -155,82 +162,68 @@ class GeoTiffAnalyzer:
         self.plot_resolutions(geo_data)
 
 class InterpolationProcessor:
-    def __init__(self, input_dir, output_dir, csv_file):
+    def __init__(self, input_dir, output_dir, csv_file, interpolation_method='bilinear'):
         self.input_dir = input_dir
         self.output_dir = output_dir
         self.csv_file = csv_file
+        self.interpolation_method = interpolation_method
 
-    def calculate_average_pixel_size(self, tiff_files):
+    def calculate_average_pixel_size(self, group_data: pd.DataFrame):
         """
         Рассчитывает средний размер пикселя (xRes, yRes) для группы изображений.
         """
-        pixel_sizes = []
-        for file in tiff_files:
-            dataset = gdal.Open(file)
-            if dataset is None:
-                print(f"Ошибка открытия файла: {file}")
-                continue
+        avg_pixel_deg_width = group_data['pixel_size_x_deg'].mean()
+        avg_pixel_deg_height = group_data['pixel_size_y_deg'].mean()
+        return avg_pixel_deg_width, avg_pixel_deg_height
 
-            geo_transform = dataset.GetGeoTransform()
-            pixel_width = geo_transform[1]
-            pixel_height = abs(geo_transform[5])
-            pixel_sizes.append((pixel_width, pixel_height))
-
-        if not pixel_sizes:
-            return None, None
-
-        avg_pixel_width = sum(ps[0] for ps in pixel_sizes) / len(pixel_sizes)
-        avg_pixel_height = sum(ps[1] for ps in pixel_sizes) / len(pixel_sizes)
-        return avg_pixel_width, avg_pixel_height
-
-    def interpolate_group(self, group, group_name):
+    def interpolate_file(self, avg_pixel_deg_size, file, output_file):
+        print(avg_pixel_deg_size)
+        try:
+            print(file)
+            gdal.Warp(
+                output_file,
+                file,
+                format="GTiff",
+                xRes=avg_pixel_deg_size[0],
+                yRes=avg_pixel_deg_size[1],
+                resampleAlg=self.interpolation_method,
+                creationOptions=["COMPRESS=LZW"]
+            )
+            output_dataset = gdal.Open(output_file)
+            if output_dataset:
+                print(f"Размеры файла {output_file}: {output_dataset.RasterXSize}x{output_dataset.RasterYSize}")
+                print(f"Размер пикселя: {avg_pixel_deg_size[0]}x{avg_pixel_deg_size[1]}")
+                output_dataset = None
+            else:
+                print(f"Не удалось открыть обработанный файл: {output_file}")
+            print(f"Интерполяция выполнена для {file} -> {output_file}")
+        except Exception as e:
+            print(f"Ошибка обработки файла {file}: {e}")
+    
+    def interpolate_group(self, group_data, group_name):
         """
         Интерполяция изображений группы без обрезки, с унификацией размера пикселя.
         """
         group_output_dir = os.path.join(self.output_dir, group_name)
         os.makedirs(group_output_dir, exist_ok=True)
-        tiff_files = [os.path.join(self.input_dir, f"{ridge}.tif") for ridge in group['ridge']]
+        
+        tiff_files_path = [os.path.join(self.input_dir, f"{file}") for file in group_data['file']]
 
-        # Рассчитываем средний размер пикселя для группы
-        avg_pixel_width, avg_pixel_height = self.calculate_average_pixel_size(tiff_files)
-        if avg_pixel_width is None or avg_pixel_height is None:
-            print(f"Нет данных для обработки группы: {group_name}")
-            return
-
-        print(f"Средний размер пикселя: width={avg_pixel_width}, height={avg_pixel_height}")
+        # Средний размер пикселя для группы в градусах широты и долготы
+        avg_pixel_width, avg_pixel_height = self.calculate_average_pixel_size(group_data)
 
         # Интерполяция каждого файла без изменения экстента
-        for file in tiff_files:
-            output_file = os.path.join(group_output_dir, os.path.basename(file))
-            try:
-                gdal.Warp(
-                    output_file,
-                    file,
-                    format="GTiff",
-                    xRes=avg_pixel_width,
-                    yRes=avg_pixel_height,
-                    resampleAlg="near",
-                    creationOptions=["COMPRESS=LZW"]
-                )
-                output_dataset = gdal.Open(output_file)
-                if output_dataset:
-                    print(f"Размеры файла {output_file}: {output_dataset.RasterXSize}x{output_dataset.RasterYSize}")
-                    print(f"Размер пикселя: {avg_pixel_width}x{avg_pixel_height}")
-                else:
-                    print(f"Не удалось открыть обработанный файл: {output_file}")
-                print(f"Интерполяция выполнена для {file} -> {output_file}")
-            except Exception as e:
-                print(f"Ошибка обработки файла {file}: {e}")
+        for file_path in tiff_files_path:
+            print(f'Происходит интерполяция {file_path}')
+            self.interpolate_file(avg_pixel_deg_size=(avg_pixel_width, avg_pixel_height), 
+                                  file=file_path, 
+                                  output_file=os.path.join(group_output_dir, os.path.basename(file_path)))
 
-    def process(self):
-        # Чтение данных из CSV
-        data = pd.read_csv(self.csv_file)
-
-        # Обработка каждой группы
-        for group_name in data.columns:
+    def process(self, geo_data_path, groups: dict):
+        data = pd.read_csv(geo_data_path)
+        
+        # Обработка всех групп
+        for group_name, group_images_names in groups.items():
             print(f"Обработка группы: {group_name}")
-            group_data = data[[group_name]].dropna()
-            group_data.columns = ['ridge']
-
-            # Интерполяция группы
+            group_data = data[data['file'].isin(group_images_names)]
             self.interpolate_group(group_data, group_name)
