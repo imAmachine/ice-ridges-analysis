@@ -177,7 +177,6 @@ class InterpolationProcessor:
         return avg_pixel_deg_width, avg_pixel_deg_height
 
     def interpolate_file(self, avg_pixel_deg_size, file, output_file):
-        print(avg_pixel_deg_size)
         try:
             print(file)
             gdal.Warp(
