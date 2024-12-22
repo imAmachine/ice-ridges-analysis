@@ -1,3 +1,8 @@
+import os
+import pandas as pd
+from osgeo import gdal
+
+
 class InterpolationProcessor:
     def __init__(self, input_dir, output_dir, csv_file, interpolation_method='bilinear'):
         self.input_dir = input_dir
@@ -15,7 +20,7 @@ class InterpolationProcessor:
 
     def interpolate_file(self, avg_pixel_deg_size, file, output_file):
         try:
-            print(file)
+            print(f'Происходит интерполяция {file}')
             gdal.Warp(
                 output_file,
                 file,
@@ -50,10 +55,9 @@ class InterpolationProcessor:
 
         # Интерполяция каждого файла без изменения экстента
         for file_path in tiff_files_path:
-            print(f'Происходит интерполяция {file_path}')
             self.interpolate_file(avg_pixel_deg_size=(avg_pixel_width, avg_pixel_height), 
                                   file=file_path, 
-                                  output_file=os.path.join(group_output_dir, os.path.basename(file_path)))
+                                  output_file=os.path.join(group_output_dir, f"{os.path.basename(file_path.replace('.tif', ''))}_interpolated.tif"))
 
     def process(self, geo_data_path, groups: dict):
         data = pd.read_csv(geo_data_path)

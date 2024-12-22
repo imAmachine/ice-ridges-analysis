@@ -2,7 +2,8 @@ import os
 from analysis.dataloaders import CSVAnnotationDataloader, ImageDataloader
 from analysis.fractal_funcs import DataAnalyzer, FractalAnalyzer
 from analysis.funcs_koch import SnowKoch, SierpinskiTriangle, FractalTester
-from analysis.geotif_analyzer import GeoTiffAnalyzer, InterpolationProcessor
+from analysis.geotif_analyzer import GeoTiffAnalyzer
+from analysis.interpolation_processor import InterpolationProcessor
 from settings import CSV_FOLDER_PATH, MASKS_FOLDER_PATH, SOURCE_IMAGES_FOLDER_PATH, ANALYSIS_OUTPUT_FOLDER_PATH
 
 geo_data_path = os.path.join(ANALYSIS_OUTPUT_FOLDER_PATH, 'geo_data.csv')

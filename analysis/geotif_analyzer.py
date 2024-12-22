@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from osgeo import gdal
 from itertools import combinations
-from math import radians, sin, cos, atan2, sqrt, pi
+from math import radians, sin, cos, atan2, sqrt
 gdal.DontUseExceptions()
 
 class GeoTiffAnalyzer:
