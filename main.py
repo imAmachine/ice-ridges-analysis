@@ -20,14 +20,11 @@ def analyze_geotiff():
     tif_analyzer.analyze()
 
 def interpolation_tiff():
-    group_1 = ('ridge_8.tif', 'ridge_9.tif', 'ridge_10.tif')
-    group_2 = ('ridge_2.tif', 'ridge_3.tif')
-    group_3 = ('ridge_4.tif', 'ridge_5.tif', 'ridge_6.tif', 'ridge_7.tif')
     processor = InterpolationProcessor(SOURCE_IMAGES_FOLDER_PATH, unified_images_folder_path, distances_csv_path)
     processor.process(geo_data_path=geo_data_path, groups={
-        'group_1': group_1,
-        'group_2': group_2,
-        'group_3': group_3,
+        'group_1': ('ridge_8.tif', 'ridge_9.tif', 'ridge_10.tif'),
+        'group_2': ('ridge_2.tif', 'ridge_3.tif'),
+        'group_3': ('ridge_4.tif', 'ridge_5.tif', 'ridge_6.tif', 'ridge_7.tif'),
     })
 
 def main():
