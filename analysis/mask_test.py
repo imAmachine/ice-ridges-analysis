@@ -1,47 +1,52 @@
+import os
 import rasterio
 import matplotlib.pyplot as plt
 import numpy as np
 from PIL import Image
 import cv2
 
-# Функция для изменения разрешения с сохранением пропорций
-def resize_with_aspect(image, scale_factor):
+SOURCE_TIF_PATH = './data/tifs/'
+MASKS_TIF_PATH = './data/images'
+
+UNIFIED_TIF_PATH = './data/processed_output/unified_analyze/images'
+OUTPUT_TIF_ON_MASK_PATH = './data/processed_output/mask_on_tif'
+
+FILENAME = ''
+
+# Функция для изменения разрешения с фиксированной шириной (2048 пикселей)
+def resize_to_width(image, target_width):
     height, width = image.shape
+    scale_factor = target_width / width
     new_height = int(height * scale_factor)
-    new_width = int(width * scale_factor)
-    resized_image = cv2.resize(image, (new_width, new_height), interpolation=cv2.INTER_LINEAR)
+    resized_image = cv2.resize(image, (target_width, new_height), interpolation=cv2.INTER_LINEAR)
     return resized_image
 
-# Загрузка GeoTIF изображения
-with rasterio.open('../data/tifs/ridge_2.tif') as src:
-    image = src.read(1)  # для одноканального изображения
+TARGET_WIDTH = 2048
 
-# Снижение разрешения GeoTIF (например, до 25% от оригинального)
-scale_factor = 0.25  # коэффициент уменьшения
-image_resized = resize_with_aspect(image, scale_factor)
+for i in range(1, 11):
+    # Загрузка GeoTIFF
+    with rasterio.open(os.path.join(SOURCE_TIF_PATH, f'ridge_{i}.tif')) as src:
+        image = src.read(1)
 
-# Загрузка маски PNG и преобразование в одноканальный формат
-mask = np.array(Image.open('../data/images/Ridge_2_medial_axis.png').convert('L'))
+    # Масштабирование GeoTIFF до 2048 пикселей по ширине
+    image_resized = resize_to_width(image, TARGET_WIDTH)
 
-# Изменение размера маски под уменьшенное GeoTIF
-resized_mask = cv2.resize(mask, (image_resized.shape[1], image_resized.shape[0]), interpolation=cv2.INTER_NEAREST)
+    # Загрузка маски и преобразование
+    mask = np.array(Image.open(os.path.join(MASKS_TIF_PATH, f'Ridge_{i}_medial_axis.png')).convert('L'))
+    mask_resized = cv2.resize(mask, (image_resized.shape[1], image_resized.shape[0]), interpolation=cv2.INTER_NEAREST)
 
-# Создание RGBA маски (исправлено)
-overlay = np.zeros((resized_mask.shape[0], resized_mask.shape[1], 4), dtype=np.float64)  # Трёхмерный массив
-overlay[:, :, 0] = np.where(resized_mask > 0, 255, 0)  # Красный канал
-overlay[:, :, 3] = np.where(resized_mask > 0, 128, 0)  # Альфа-канал (прозрачность)
+    # Создание RGBA-маски
+    overlay = np.zeros((mask_resized.shape[0], mask_resized.shape[1], 4), dtype=np.uint8)
+    overlay[:, :, 0] = np.where(mask_resized > 0, 255, 0)  # Красный канал
+    overlay[:, :, 3] = np.where(mask_resized > 0, 128, 0)  # Альфа-канал
 
-# Создание визуализации
-plt.figure(figsize=(12, 8))
+    # Визуализация и сохранение
+    plt.figure(figsize=(12, 8))
+    plt.imshow(image_resized, cmap='gray')
+    plt.imshow(overlay, interpolation='none')
+    plt.title('Снимок с наложенной маской торосов')
+    plt.axis('off')
 
-# Отображение GeoTIF
-plt.imshow(image_resized, cmap='gray')
-
-# Отображение маски
-plt.imshow(overlay, interpolation='none')
-plt.title('Снимок с наложенной маской торосов')
-plt.axis('off')
-
-# Сохранение результата
-plt.savefig('../data/processed_output/mask_on_tif/ridge_2.png', bbox_inches='tight', dpi=300)
-plt.show()
+    output_path = os.path.join(OUTPUT_TIF_ON_MASK_PATH, f'ridge_{i}.png')
+    plt.savefig(output_path, bbox_inches='tight', dpi=300)
+    plt.close()
